@@ -1253,11 +1253,36 @@ def main(argv: Optional[List[str]] = None):
                         clear_screen(); print(f"Počet nenulových v každém řádku: {dict(zip(nodes2, rc))}")
                     elif sub == '4':
                         cc = col_counts(inc)
-                        col_names = [f"edge_{i}" for i in range(len(edges))]
+                        # prefer edge labels for column names
+                        col_names = []
+                        for i, (u, v, d) in enumerate(edges):
+                            lbl = None
+                            try:
+                                if d:
+                                    lbl = d.get('label')
+                            except Exception:
+                                lbl = None
+                            if lbl:
+                                col_names.append(lbl)
+                            else:
+                                col_names.append(f"{u}-{v}" if u is not None and v is not None else f"edge_{i}")
                         clear_screen(); print(f"Počet nenulových v každém sloupci: {dict(zip(col_names, cc))}")
                     elif sub == '5':
                         path = input("Cesta k výstupnímu souboru (např. incidence.txt): ").strip() or 'incidence_matrix.txt'
-                        ok, msg = export_matrix_to_file(inc, row_names=nodes2, col_names=[f"edge_{i}" for i in range(len(edges))], path=path)
+                        # build column names preferring labels
+                        col_names = []
+                        for i, (u, v, d) in enumerate(edges):
+                            lbl = None
+                            try:
+                                if d:
+                                    lbl = d.get('label')
+                            except Exception:
+                                lbl = None
+                            if lbl:
+                                col_names.append(lbl)
+                            else:
+                                col_names.append(f"{u}-{v}" if u is not None and v is not None else f"edge_{i}")
+                        ok, msg = export_matrix_to_file(inc, row_names=nodes2, col_names=col_names, path=path)
                         if ok:
                             print(f"Vystup ulozen do: {msg}")
                         else:
@@ -1439,8 +1464,13 @@ def main(argv: Optional[List[str]] = None):
                     print(f"Výstupní uzly: {[n for n in G.nodes() if G.out_degree(n) > 0] if G.is_directed() else []}")
                     incident = set()
                     for u, v, d in G.edges(data=True):
-                        if u == node or v == node:
-                            incident.add(u); incident.add(v)
+                        # add only the other endpoint; include the node only for self-loops
+                        if u == node and v != node:
+                            incident.add(v)
+                        elif v == node and u != node:
+                            incident.add(u)
+                        elif u == node and v == node:
+                            incident.add(node)
                     print(f"Incidenční uzly: {sorted(list(incident))}")
                 elif nc == '1':
                     clear_screen()
@@ -1469,8 +1499,12 @@ def main(argv: Optional[List[str]] = None):
                     # incidenční uzly: nodes incident to same edges
                     incident = set()
                     for u, v, d in G.edges(data=True):
-                        if u == node or v == node:
-                            incident.add(u); incident.add(v)
+                        if u == node and v != node:
+                            incident.add(v)
+                        elif v == node and u != node:
+                            incident.add(u)
+                        elif u == node and v == node:
+                            incident.add(node)
                     clear_screen()
                     print(sorted(list(incident)))
                 else:
