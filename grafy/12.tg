@@ -1,0 +1,17 @@
+u A;
+u B;
+u C;
+u D;
+u E;
+u F;
+u G;
+u H;
+u I;
+h A > D 3 :h1;
+h D > C 7 :h2;
+h C > H 10 :h3;
+h F > B 5 :h4;
+h E > F 1 :h5;
+h I > E 4 :h6;
+h H > G 5 :h7;
+h H > I 2 :h8;

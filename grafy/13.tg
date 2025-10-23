@@ -1,0 +1,14 @@
+u A;
+u B;
+u C;
+u D;
+u E;
+u F;
+h C > A 2;
+h A > D 1;
+h D > E 4;
+h E > F 1;
+h F > B -3;
+h B > C 2;
+h B > E 3;
+h A > B 5;

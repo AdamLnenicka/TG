@@ -1,0 +1,15 @@
+u A;
+u B;
+u C;
+u D;
+u E;
+h A > B 3 :h1;
+h A > C 2 :h2;
+h B > C 3 :h3;
+h A > E 7 :h4;
+h D > A 5 :h5;
+h E > B 8 :h6;
+h C > D 6 :h7;
+h B > D 2 :h8;
+h D > E 4 :h9;
+h E > C 3 :h10;

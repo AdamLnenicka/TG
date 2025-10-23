@@ -1,0 +1,12 @@
+u A;
+u B;
+u C;
+u D;
+u E;
+u F;
+h A > B :h6;
+h F > A :h4;
+h C > A :h3;
+h B > C :h1;
+h D > D :h2;
+h C > D :h5;

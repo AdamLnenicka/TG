@@ -1,0 +1,11 @@
+u A;
+u B;
+u C;
+u D;
+u E;
+h A > B 2;
+h D > B -1;
+h B > C -1;
+h C > D 1;
+h A > E 1;
+h E > C 3;

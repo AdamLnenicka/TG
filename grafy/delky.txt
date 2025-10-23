@@ -1,0 +1,15 @@
+	A	B	C	D	E	F	G	H	I	J	K	L	M	N
+A	0	8.0	3.0	6.0	10.0	7.0	12.0	11.0	11.0	16.0	15.0	17.0	12.0	9.0
+B	inf	0	inf	inf	6.0	inf	inf	inf	7.0	12.0	11.0	9.0	4.0	1.0
+C	12.0	5.0	0	3.0	7.0	4.0	9.0	8.0	8.0	13.0	12.0	14.0	9.0	6.0
+D	9.0	17.0	12.0	0	9.0	1.0	8.0	5.0	10.0	15.0	14.0	13.0	19.0	17.0
+E	inf	inf	inf	inf	0	inf	inf	inf	1.0	6.0	5.0	12.0	10.0	8.0
+F	29.0	22.0	17.0	20.0	24.0	0	7.0	4.0	25.0	30.0	29.0	12.0	26.0	23.0
+G	22.0	15.0	10.0	13.0	17.0	14.0	0	9.0	18.0	23.0	22.0	17.0	19.0	16.0
+H	25.0	18.0	13.0	16.0	20.0	6.0	3.0	0	21.0	26.0	25.0	8.0	22.0	19.0
+I	inf	inf	inf	inf	inf	inf	inf	inf	0	5.0	4.0	11.0	9.0	7.0
+J	inf	inf	inf	inf	inf	inf	inf	inf	inf	0	inf	6.0	4.0	inf
+K	inf	inf	inf	inf	inf	inf	inf	inf	inf	inf	0	11.0	6.0	3.0
+L	inf	inf	inf	inf	inf	inf	inf	inf	inf	inf	inf	0	inf	inf
+M	inf	inf	inf	inf	inf	inf	inf	inf	inf	inf	inf	5.0	0	inf
+N	inf	inf	inf	inf	inf	inf	inf	inf	inf	inf	inf	8.0	3.0	0
