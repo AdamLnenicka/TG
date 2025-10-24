@@ -1,0 +1,86 @@
+Níže jsou podrobné kroky jak připravit offline balíček (na stroji s internetem) a jak ho následně nainstalovat a spustit na cílovém stroji bez internetu.
+
+1) Na stroji s internetem — připravit balíček (wheelhouse)
+
+PowerShell / Windows (internetový stroj):
+
+```powershell
+# vytvoř pracovní složku
+mkdir C:\tmp\tg_offline
+Set-Location C:\tmp\tg_offline
+
+# stáhni všechny závislosti uvedené v requirements.txt do podsložky 'packages'
+# použij cestu k vašemu repozitáři, např. C:\Users\You\Desktop\TG\grafy\requirements.txt
+python -m pip download -r C:\cesta\k\repo\grafy\requirements.txt -d .\packages
+
+# zkopíruj do balíčku i samotný skript a .tg soubory (místní repozitář)
+mkdir payload
+robocopy C:\cesta\k\repo\grafy payload *.py *.tg requirements.txt README.md
+
+# zabal celé do zipu (nebo přeneste složku 'tg_offline' přes USB)
+Compress-Archive .\ tg_offline.zip
+```
+
+Linux / macOS (internetový stroj):
+
+```bash
+mkdir -p ~/tg_offline && cd ~/tg_offline
+python3 -m pip download -r /cesta/k/repo/grafy/requirements.txt -d ./packages
+mkdir payload
+cp /cesta/k/repo/grafy/*.py /cesta/k/repo/grafy/*.tg /cesta/k/repo/grafy/requirements.txt ./payload/ 2>/dev/null || true
+zip -r tg_offline.zip .
+```
+
+Poznámky:
+- `pip download` stáhne wheel nebo sdist pro `networkx` a případné závislosti. `networkx` je čistě Python projekt (obvykle bez binárních závislostí), takže to funguje napříč platformami, ale pro jistotu použijte na internetovém stroji stejný hlavní/minor Python (např. Python 3.10), jaký máte na cílovém stroji.
+- Pokud znáte přesnou platformu cílového stroje (Windows x86_64, manylinux), můžete použít volbu `--platform`/`--only-binary` (pokročilejší), ale většinou stačí běžné wheel.
+
+2) Na cílovém stroji (bez internetu) — instalace a spuštění
+
+Přenesete `tg_offline.zip` nebo složku `tg_offline` z internetového stroje na cílový (USB, interní síť apod.) a rozbalíte.
+
+Windows / PowerShell (cílový stroj):
+
+```powershell
+# Přejděte do rozbalené složky, např. C:\tmp\tg_offline\payload nebo do adresáře 'payload' uvnitř balíčku
+Set-Location C:\cesta\k\tg_offline\payload
+
+# Vytvoř virtuální prostředí
+python -m venv .venv
+
+# Aktivuj (PowerShell)
+.\.venv\Scripts\Activate.ps1
+
+# Aktualizuj pip (volitelné) a nainstaluj závislosti z lokální složky 'packages'
+python -m pip install --upgrade pip
+python -m pip install --no-index --find-links .\..\packages -r requirements.txt
+
+# Spusť nástroj
+python .\graph_tool.py summary 01.tg
+```
+
+Linux / bash (cílový stroj):
+
+```bash
+cd /cesta/k/tg_offline/payload
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install --no-index --find-links ../packages -r requirements.txt
+python3 graph_tool.py summary 01.tg
+```
+
+3) Co dělat když wheel chybí nebo pip selže
+- Pokud `pip` nenajde balíček v lokální `packages`, zkontrolujte, že v `packages` opravdu je `networkx` (soubor typu `networkx-<verze>-py3-none-any.whl` nebo sdist `networkx-<verze>.tar.gz`).
+- Pokud cílový stroj používá jinou verzi Pythonu (např. 3.11) než internetový stroj (3.9), doporučuji na internetovém stroji stáhnout balíčky pro odpovídající verzi Pythonu (použít stejný python interpreter pro `pip download`).
+- Pokud cílový stroj vůbec nemá Python, musíte nejprve nainstalovat offline Python instalátorem (stáhněte MSI pro Windows nebo .tar/.deb pro Linux na internetovém stroji a přeneste).
+
+4) Automatizační skripty
+V repozitáři jsem přidal jednoduché skripty `grafy/run.ps1` a `grafy/run.sh`, které provádějí vytvoření venv (pokud neexistuje), aktivaci a instalaci závislostí z lokální složky `packages` a následné spuštění `graph_tool.py`.
+
+5) Doporučení
+- Použijte stejnou major.minor verzi Pythonu na internetovém i cílovém stroji.
+- Nechte ve složce `packages` také `pip` — to většinou není nutné, ale kontrolujte kompatibilitu.
+- Testujte balíček na jedné offline testovací stanici před nasazením do cílového stroje.
+
+Hotovo — pokud chcete, můžu nyní do repozitáře automaticky vytvořit tyto spouštěcí skripty (`grafy/run.ps1`, `grafy/run.sh`).
