@@ -859,6 +859,858 @@ def cmd_analyze(args):
         print(f"  {n}: {neigh}")
 
 
+# ============================================================================
+# SEKCE 5: Stromy a kostry
+# ============================================================================
+
+def dfs_traversal(G, start=None):
+    """Prohledávání grafu do hloubky (DFS)."""
+    if start is None:
+        start = next(iter(G.nodes())) if G.number_of_nodes() > 0 else None
+    if start is None:
+        return []
+    return list(nx.dfs_preorder_nodes(G, source=start))
+
+
+def bfs_traversal(G, start=None):
+    """Prohledávání grafu do šířky (BFS)."""
+    if start is None:
+        start = next(iter(G.nodes())) if G.number_of_nodes() > 0 else None
+    if start is None:
+        return []
+    return list(nx.bfs_tree(G, source=start).nodes())
+
+
+def count_spanning_trees(G):
+    """
+    Spočítat počet koster grafu.
+    Pro neorientované grafy: Kirchhoffův maticový strom.
+    Pro orientované grafy: složitější výpočet.
+    """
+    try:
+        if G.is_directed():
+            # Pro orientované grafy je to složitější, vrátíme -1 jako N/A
+            print("Počet koster orientovaného grafu vyžaduje pokročilé algoritmy (není implementováno)")
+            return -1
+        else:
+            # Kirchhoffův strom
+            if not nx.is_connected(G):
+                return 0
+            L = nx.laplacian_matrix(G)
+            # Determinant z (n-1)x(n-1) submatrixu
+            import numpy as np
+            L_sub = L[:-1, :-1].toarray()
+            det = np.linalg.det(L_sub)
+            return int(round(abs(det)))
+    except Exception as e:
+        print(f"Chyba při výpočtu počtu koster: {e}")
+        return None
+
+
+def max_weight_spanning_tree(G):
+    """Maximální kostru (opakem min s negovanými vahami)."""
+    try:
+        if G.is_directed():
+            U = G.to_undirected(as_view=False)
+        else:
+            U = G
+        # Negujeme váhy
+        G_neg = U.copy()
+        for u, v, d in G_neg.edges(data=True):
+            if d.get('weight') is not None:
+                d['weight'] = -d['weight']
+        T = nx.minimum_spanning_tree(G_neg, weight='weight')
+        # Vrátíme s původními vahami
+        return T
+    except Exception as e:
+        print(f"Chyba: {e}")
+        return None
+
+
+def preorder_traversal(G, root=None):
+    """Preorder traversal stromu (kořen, levý, pravý)."""
+    if root is None:
+        root = next(iter(G.nodes())) if G.number_of_nodes() > 0 else None
+    if root is None:
+        return []
+    result = []
+    visited = set()
+    
+    def preorder(node):
+        if node not in visited:
+            visited.add(node)
+            result.append(node)
+            for child in G.neighbors(node):
+                if child not in visited:
+                    preorder(child)
+    
+    preorder(root)
+    return result
+
+
+def postorder_traversal(G, root=None):
+    """Postorder traversal stromu (levý, pravý, kořen)."""
+    if root is None:
+        root = next(iter(G.nodes())) if G.number_of_nodes() > 0 else None
+    if root is None:
+        return []
+    result = []
+    visited = set()
+    
+    def postorder(node):
+        for child in G.neighbors(node):
+            if child not in visited:
+                visited.add(child)
+                postorder(child)
+        result.append(node)
+    
+    visited.add(root)
+    postorder(root)
+    return result
+
+
+def inorder_traversal(G, root=None):
+    """Inorder traversal stromu (levý, kořen, pravý) - pro binární stromy."""
+    if root is None:
+        root = next(iter(G.nodes())) if G.number_of_nodes() > 0 else None
+    if root is None:
+        return []
+    result = []
+    visited = set()
+    children_list = list(G.neighbors(root))
+    
+    def inorder(node, is_root=False):
+        neighbors = list(G.neighbors(node))
+        # Pro binární strom: levý, kořen, pravý
+        if len(neighbors) >= 1:
+            left = neighbors[0]
+            if left not in visited:
+                visited.add(left)
+                inorder(left)
+        
+        result.append(node)
+        
+        if len(neighbors) >= 2:
+            right = neighbors[1]
+            if right not in visited:
+                visited.add(right)
+                inorder(right)
+    
+    visited.add(root)
+    inorder(root, True)
+    return result
+
+
+def levelorder_traversal(G, root=None):
+    """Level-order traversal stromu (procházení po hladinách - BFS)."""
+    if root is None:
+        root = next(iter(G.nodes())) if G.number_of_nodes() > 0 else None
+    if root is None:
+        return []
+    
+    result = []
+    visited = {root}
+    queue = [root]
+    
+    while queue:
+        node = queue.pop(0)
+        result.append(node)
+        for child in G.neighbors(node):
+            if child not in visited:
+                visited.add(child)
+                queue.append(child)
+    
+    return result
+
+
+# ============================================================================
+# SEKCE 6: Optimální sledy
+# ============================================================================
+
+def longest_path(G, src, dst, verbose=False):
+    """Nejdelší cesta mezi src a dst (v DAG)."""
+    try:
+        if not nx.is_directed_acyclic_graph(G):
+            if verbose:
+                print("⚠️  Graf obsahuje cykly - nejdelší cesta není definována")
+            return None, float('-inf')
+        
+        if verbose:
+            print(f"📊 Hledání nejdelší cesty: {src} → {dst}")
+            print(f"   Počet uzlů: {G.number_of_nodes()}, Počet hran: {G.number_of_edges()}")
+        
+        # Negujeme váhy
+        G_neg = G.copy()
+        for u, v, d in G_neg.edges(data=True):
+            if d.get('weight') is not None:
+                d['weight'] = -d['weight']
+            else:
+                d['weight'] = -1
+        
+        try:
+            path = nx.shortest_path(G_neg, source=src, target=dst, weight='weight')
+            length = nx.shortest_path_length(G_neg, source=src, target=dst, weight='weight')
+            
+            if verbose:
+                print(f"\n✓ Cesta nalezena!")
+                print(f"   Posloupnost: {' → '.join(path)}")
+                print(f"   Počet hran: {len(path) - 1}")
+                print(f"   Celková délka: {-length}")
+                
+                # Detaily hran
+                print(f"\n   Detaily jednotlivých hran:")
+                total = 0
+                for i in range(len(path) - 1):
+                    u, v = path[i], path[i + 1]
+                    edge_data = G.get_edge_data(u, v)
+                    w = edge_data.get('weight', 1) if isinstance(edge_data, dict) else 1
+                    total += w
+                    print(f"      {u} → {v}: váha={w} (kumulativně: {total})")
+            
+            return path, -length
+        except nx.NetworkXNoPath:
+            if verbose:
+                print(f"❌ Cesta mezi {src} a {dst} neexistuje")
+            return None, float('-inf')
+    except Exception as e:
+        if verbose:
+            print(f"❌ Chyba: {e}")
+        return None, float('-inf')
+
+
+def widest_path(G, src, dst, verbose=False):
+    """Nejširší cesta (cesta s maximální minimální kapacitou)."""
+    try:
+        # Dijkstra s kapacitou místo vzdálenosti
+        if src not in G or dst not in G:
+            if verbose:
+                print(f"❌ Uzel {src} nebo {dst} není v grafu")
+            return None
+        
+        if verbose:
+            print(f"📊 Hledání nejširší cesty: {src} → {dst}")
+            print(f"   Algoritmus: Dijkstra s maximalizací kapacity")
+            print(f"   Počet uzlů: {G.number_of_nodes()}, Počet hran: {G.number_of_edges()}")
+        
+        import heapq
+        # Maximalizujeme min kapacitu na cestě
+        visited = set()
+        # (neg_capacity, node, path)
+        pq = [(-float('inf'), src, [src])]
+        capacities = {src: float('inf')}
+        steps = []
+        
+        while pq:
+            cap, node, path = heapq.heappop(pq)
+            cap = -cap
+            
+            if verbose:
+                steps.append(f"Zpracovávám: {node} (kapacita={cap:.2f}, hloubka={len(path)-1})")
+            
+            if node == dst:
+                if verbose:
+                    print(f"\n✓ Cesta nalezena!")
+                    print(f"   Posloupnost: {' → '.join(path)}")
+                    print(f"   Minimální kapacita: {cap:.2f}")
+                    print(f"   Počet hran: {len(path) - 1}")
+                    print(f"\n   Detaily jednotlivých hran:")
+                    for i in range(len(path) - 1):
+                        u, v = path[i], path[i + 1]
+                        edge_data = G.get_edge_data(u, v)
+                        w = edge_data.get('weight', 1) if isinstance(edge_data, dict) else 1
+                        print(f"      {u} → {v}: kapacita={w:.2f}")
+                    if len(steps) <= 10:
+                        print(f"\n   Kroky procházení (počet: {len(steps)}):")
+                        for step in steps[:10]:
+                            print(f"      {step}")
+                    else:
+                        print(f"\n   Kroky procházení (zobrazuji prvních 10 z {len(steps)}):")
+                        for step in steps[:10]:
+                            print(f"      {step}")
+                return path, cap
+            
+            if node in visited:
+                continue
+            visited.add(node)
+            
+            for neighbor in G.neighbors(node):
+                if neighbor not in visited:
+                    # Kapacita je váha hrany (nebo 1 je-li bez váhy)
+                    edge_data = G.get_edge_data(node, neighbor)
+                    if isinstance(edge_data, dict):
+                        edge_cap = edge_data.get('weight', 1)
+                    elif isinstance(edge_data, list):
+                        edge_cap = edge_data[0].get('weight', 1) if edge_data else 1
+                    else:
+                        edge_cap = 1
+                    
+                    # Min kapacita na cestě
+                    new_cap = min(cap, edge_cap) if cap != float('inf') else edge_cap
+                    if new_cap > capacities.get(neighbor, 0):
+                        capacities[neighbor] = new_cap
+                        heapq.heappush(pq, (-new_cap, neighbor, path + [neighbor]))
+        
+        if verbose:
+            print(f"❌ Cesta mezi {src} a {dst} neexistuje")
+        return None, 0
+    except Exception as e:
+        if verbose:
+            print(f"❌ Chyba: {e}")
+        return None, 0
+
+
+def safest_path(G, src, dst, verbose=False):
+    """Nejbezpečnější cesta (cesta s maximální minimální bezpečností)."""
+    # Bezpečnost = převrácená hodnota rizika (váha)
+    # Equivalentní widest_path s inverzními vahami
+    try:
+        if verbose:
+            print(f"📊 Hledání nejbezpečnější cesty: {src} → {dst}")
+            print(f"   Algoritmus: Maximalizace minimální bezpečnosti")
+            print(f"   Bezpečnost = 1/riziko")
+        
+        G_inv = G.copy()
+        for u, v, d in G_inv.edges(data=True):
+            w = d.get('weight', 1)
+            if w > 0:
+                d['weight'] = 1.0 / w
+        
+        path, safety = widest_path(G_inv, src, dst, verbose=False)
+        
+        if verbose and path:
+            print(f"\n✓ Nejbezpečnější cesta nalezena!")
+            print(f"   Posloupnost: {' → '.join(path)}")
+            print(f"   Minimální bezpečnost: {safety:.4f}")
+            print(f"   Počet hran: {len(path) - 1}")
+            print(f"\n   Detaily jednotlivých hran (rizika):")
+            for i in range(len(path) - 1):
+                u, v = path[i], path[i + 1]
+                edge_data = G.get_edge_data(u, v)
+                risk = edge_data.get('weight', 1) if isinstance(edge_data, dict) else 1
+                safety_val = 1.0 / risk if risk > 0 else 0
+                print(f"      {u} → {v}: riziko={risk:.4f}, bezpečnost={safety_val:.4f}")
+        elif verbose:
+            print(f"❌ Cesta neexistuje")
+        
+        return path, safety
+    except Exception as e:
+        if verbose:
+            print(f"❌ Chyba: {e}")
+        return None, 0
+
+
+def most_dangerous_path(G, src, dst, verbose=False):
+    """Nejnebezpečnější cesta (minimální bezpečnost na cestě)."""
+    # Opak safest_path: hledáme cestu s minimální minimální bezpečností
+    try:
+        if src not in G or dst not in G:
+            if verbose:
+                print(f"❌ Uzel {src} nebo {dst} není v grafu")
+            return None, 0
+        
+        if verbose:
+            print(f"📊 Hledání nejnebezpečnější cesty: {src} → {dst}")
+            print(f"   Algoritmus: Minimalizace minimální bezpečnosti")
+            print(f"   Počet uzlů: {G.number_of_nodes()}, Počet hran: {G.number_of_edges()}")
+        
+        import heapq
+        visited = set()
+        # (safety, node, path) - minimalizujeme bezpečnost
+        pq = [(float('inf'), src, [src])]
+        min_safety = {src: float('inf')}
+        steps = []
+        
+        while pq:
+            safety, node, path = heapq.heappop(pq)
+            
+            if verbose:
+                steps.append(f"Zpracovávám: {node} (bezpečnost={safety:.4f}, hloubka={len(path)-1})")
+            
+            if node == dst:
+                if verbose:
+                    print(f"\n✓ Nejnebezpečnější cesta nalezena!")
+                    print(f"   Posloupnost: {' → '.join(path)}")
+                    print(f"   Minimální bezpečnost: {safety:.4f}")
+                    print(f"   Počet hran: {len(path) - 1}")
+                    print(f"\n   Detaily jednotlivých hran (rizika):")
+                    for i in range(len(path) - 1):
+                        u, v = path[i], path[i + 1]
+                        edge_data = G.get_edge_data(u, v)
+                        risk = edge_data.get('weight', 1) if isinstance(edge_data, dict) else 1
+                        safety_val = 1.0 / risk if risk > 0 else 0
+                        print(f"      {u} → {v}: riziko={risk:.4f}, bezpečnost={safety_val:.4f}")
+                    if len(steps) <= 10:
+                        print(f"\n   Kroky procházení (počet: {len(steps)}):")
+                        for step in steps[:10]:
+                            print(f"      {step}")
+                    else:
+                        print(f"\n   Kroky procházení (zobrazuji prvních 10 z {len(steps)}):")
+                        for step in steps[:10]:
+                            print(f"      {step}")
+                return path, safety
+            
+            if node in visited:
+                continue
+            visited.add(node)
+            
+            for neighbor in G.neighbors(node):
+                if neighbor not in visited:
+                    edge_data = G.get_edge_data(node, neighbor)
+                    if isinstance(edge_data, dict):
+                        risk = edge_data.get('weight', 1)
+                    else:
+                        risk = 1
+                    
+                    # Bezpečnost = 1/risk
+                    safety_val = 1.0 / risk if risk > 0 else 0
+                    new_safety = min(safety, safety_val) if safety != float('inf') else safety_val
+                    
+                    if new_safety < min_safety.get(neighbor, float('inf')):
+                        min_safety[neighbor] = new_safety
+                        heapq.heappush(pq, (new_safety, neighbor, path + [neighbor]))
+        
+        if verbose:
+            print(f"❌ Cesta mezi {src} a {dst} neexistuje")
+        return None, 0
+    except Exception as e:
+        if verbose:
+            print(f"❌ Chyba: {e}")
+        return None, 0
+
+
+def narrowest_path(G, src, dst, verbose=False):
+    """Nejužší cesta (minimální kapacita)."""
+    try:
+        if src not in G or dst not in G:
+            if verbose:
+                print(f"❌ Uzel {src} nebo {dst} není v grafu")
+            return None, float('inf')
+        
+        if verbose:
+            print(f"📊 Hledání nejužší cesty: {src} → {dst}")
+            print(f"   Algoritmus: Minimalizace minimální kapacity")
+            print(f"   Počet uzlů: {G.number_of_nodes()}, Počet hran: {G.number_of_edges()}")
+        
+        import heapq
+        visited = set()
+        # (neg_capacity, node, path)
+        pq = [(0, src, [src])]  # Začínáme s 0 (max kapacita)
+        capacities = {src: float('inf')}
+        steps = []
+        
+        while pq:
+            cap, node, path = heapq.heappop(pq)
+            cap = -cap if cap != 0 else float('inf')
+            
+            if verbose:
+                steps.append(f"Zpracovávám: {node} (kapacita={cap:.2f}, hloubka={len(path)-1})")
+            
+            if node == dst:
+                if verbose:
+                    print(f"\n✓ Nejužší cesta nalezena!")
+                    print(f"   Posloupnost: {' → '.join(path)}")
+                    print(f"   Minimální kapacita: {cap:.2f}")
+                    print(f"   Počet hran: {len(path) - 1}")
+                    print(f"\n   Detaily jednotlivých hran:")
+                    for i in range(len(path) - 1):
+                        u, v = path[i], path[i + 1]
+                        edge_data = G.get_edge_data(u, v)
+                        w = edge_data.get('weight', 1) if isinstance(edge_data, dict) else 1
+                        print(f"      {u} → {v}: kapacita={w:.2f}")
+                    if len(steps) <= 10:
+                        print(f"\n   Kroky procházení (počet: {len(steps)}):")
+                        for step in steps[:10]:
+                            print(f"      {step}")
+                    else:
+                        print(f"\n   Kroky procházení (zobrazuji prvních 10 z {len(steps)}):")
+                        for step in steps[:10]:
+                            print(f"      {step}")
+                return path, cap
+            
+            if node in visited:
+                continue
+            visited.add(node)
+            
+            for neighbor in G.neighbors(node):
+                if neighbor not in visited:
+                    edge_data = G.get_edge_data(node, neighbor)
+                    if isinstance(edge_data, dict):
+                        edge_cap = edge_data.get('weight', 1)
+                    else:
+                        edge_cap = 1
+                    
+                    # Min kapacita na cestě
+                    new_cap = min(cap, edge_cap) if cap != float('inf') else edge_cap
+                    if new_cap < capacities.get(neighbor, float('inf')):
+                        capacities[neighbor] = new_cap
+                        heapq.heappush(pq, (-new_cap, neighbor, path + [neighbor]))
+        
+        if verbose:
+            print(f"❌ Cesta mezi {src} a {dst} neexistuje")
+        return None, float('inf')
+    except Exception as e:
+        if verbose:
+            print(f"❌ Chyba: {e}")
+        return None, float('inf')
+
+
+def critical_path_method(G, start=None, end=None, verbose=False):
+    """
+    Kritická cesta v síťovém grafu (Project Network).
+    Předpokládá že váhy hran jsou doby trvání činností.
+    Vrací kritickou cestu (cestu s max délkou) a její délku.
+    """
+    try:
+        if start is None:
+            # Najdeme počáteční uzel (bez vstupních hran)
+            start = None
+            for node in G.nodes():
+                if G.in_degree(node) == 0:
+                    start = node
+                    break
+            if start is None:
+                start = next(iter(G.nodes()))
+        
+        if end is None:
+            # Najdeme koncový uzel (bez výstupních hran)
+            end = None
+            for node in G.nodes():
+                if G.out_degree(node) == 0:
+                    end = node
+                    break
+            if end is None:
+                end = next(iter(G.nodes()))
+        
+        if verbose:
+            print(f"📊 Výpočet kritické cesty")
+            print(f"   Počáteční uzel: {start}, Koncový uzel: {end}")
+            print(f"   Počet uzlů: {G.number_of_nodes()}, Počet hran: {G.number_of_edges()}")
+        
+        # Použijeme longest_path na orientovaném grafu
+        path, length = longest_path(G, start, end, verbose=False)
+        
+        if verbose and path:
+            print(f"\n✓ Kritická cesta identifikována!")
+            print(f"   Posloupnost činností: {' → '.join(path)}")
+            print(f"   Délka kritické cesty: {length}")
+            print(f"   Počet činností: {len(path) - 1}")
+            print(f"\n   Detaily činností na kritické cestě:")
+            total = 0
+            for i in range(len(path) - 1):
+                u, v = path[i], path[i + 1]
+                edge_data = G.get_edge_data(u, v)
+                duration = edge_data.get('weight', 1) if isinstance(edge_data, dict) else 1
+                total += duration
+                print(f"      {u} → {v}: trvání={duration} (kumulativně: {total})")
+        elif verbose:
+            print(f"❌ Kritickou cestu nelze spočítat")
+        
+        return path, length if length != float('-inf') else 0
+    except Exception as e:
+        if verbose:
+            print(f"❌ Chyba: {e}")
+        return None, 0
+
+
+def project_duration(G, start=None, end=None):
+    """
+    Doba trvání projektu (délka kritické cesty).
+    """
+    path, duration = critical_path_method(G, start, end)
+    return duration if duration else 0
+
+
+def activity_slack(G, start=None, end=None, verbose=False):
+    """
+    Počítá rezervu (slack/float) pro každou činnost.
+    Vrací slovník s rezervami pro každou hranu.
+    """
+    try:
+        if start is None:
+            start = next((n for n in G.nodes() if G.in_degree(n) == 0), 
+                        next(iter(G.nodes())))
+        if end is None:
+            end = next((n for n in G.nodes() if G.out_degree(n) == 0),
+                      next(iter(G.nodes())))
+        
+        if verbose:
+            print(f"📊 Výpočet rezerv činností (slack/float)")
+            print(f"   Počáteční uzel: {start}, Koncový uzel: {end}")
+            print(f"   Počet uzlů: {G.number_of_nodes()}, Počet hran: {G.number_of_edges()}")
+        
+        # Výpočet nejdříve možných časů (EFT - Earliest Finish Time)
+        eft = {}
+        # Topologické řazení
+        try:
+            topo_order = list(nx.topological_sort(G))
+        except:
+            if verbose:
+                print(f"❌ Graf obsahuje cykly - nelze spočítat rezervy")
+            return {}
+        
+        eft[start] = 0
+        for node in topo_order:
+            if node not in eft:
+                eft[node] = 0
+            for successor in G.successors(node):
+                edge_data = G.get_edge_data(node, successor)
+                duration = edge_data.get('weight', 1) if isinstance(edge_data, dict) else 1
+                eft[successor] = max(eft.get(successor, 0), eft[node] + duration)
+        
+        if verbose:
+            print(f"\n✓ Výpočet nejdříve možných časů (EFT) - forward pass:")
+            for node in topo_order[:min(10, len(topo_order))]:
+                print(f"      Uzel {node}: EFT={eft[node]:.2f}")
+            if len(topo_order) > 10:
+                print(f"      ... (celkem {len(topo_order)} uzlů)")
+        
+        # Výpočet nejpozději přijatelných časů (LST - Latest Start Time)
+        project_end = eft.get(end, 0)
+        lst = {node: project_end for node in G.nodes()}
+        lst[end] = project_end
+        
+        for node in reversed(topo_order):
+            successors = list(G.successors(node))
+            if successors:
+                min_lst = float('inf')
+                for successor in successors:
+                    edge_data = G.get_edge_data(node, successor)
+                    duration = edge_data.get('weight', 1) if isinstance(edge_data, dict) else 1
+                    min_lst = min(min_lst, lst[successor] - duration)
+                lst[node] = min_lst
+            else:
+                lst[node] = project_end
+        
+        if verbose:
+            print(f"\n✓ Výpočet nejpozději přijatelných časů (LST) - backward pass:")
+            for node in reversed(topo_order[:min(10, len(topo_order))]):
+                print(f"      Uzel {node}: LST={lst[node]:.2f}")
+            if len(topo_order) > 10:
+                print(f"      ... (celkem {len(topo_order)} uzlů)")
+        
+        # Výpočet rezerv pro hrany
+        slack = {}
+        for u, v in G.edges():
+            edge_data = G.get_edge_data(u, v)
+            duration = edge_data.get('weight', 1) if isinstance(edge_data, dict) else 1
+            edge_slack = lst[v] - eft[u] - duration
+            slack[(u, v)] = edge_slack
+        
+        if verbose:
+            print(f"\n✓ Výpočet rezerv činností:")
+            critical_activities = [e for e, s in slack.items() if abs(s) < 0.01]
+            non_critical = [e for e, s in slack.items() if abs(s) >= 0.01]
+            
+            print(f"\n   Kritické činnosti (slack=0):")
+            for (u, v), s in sorted(slack.items()):
+                if abs(s) < 0.01:
+                    edge_data = G.get_edge_data(u, v)
+                    duration = edge_data.get('weight', 1) if isinstance(edge_data, dict) else 1
+                    print(f"      {u} → {v}: slack={s:.2f}, trvání={duration}")
+            
+            if non_critical:
+                print(f"\n   Nekritické činnosti (slack>0):")
+                for (u, v), s in sorted(slack.items()):
+                    if abs(s) >= 0.01:
+                        edge_data = G.get_edge_data(u, v)
+                        duration = edge_data.get('weight', 1) if isinstance(edge_data, dict) else 1
+                        print(f"      {u} → {v}: slack={s:.2f}, trvání={duration}")
+            
+            print(f"\n   Celkový počet činností: {len(slack)}")
+            print(f"   Délka projektu: {project_end:.2f}")
+        
+        return slack
+    except Exception as e:
+        if verbose:
+            print(f"❌ Chyba: {e}")
+        return {}
+
+
+# ============================================================================
+# SEKCE 7: Toky v sítích
+# ============================================================================
+
+def max_flow(G, src, dst, verbose=False):
+    """Maximální tok mezi src a dst."""
+    try:
+        if verbose:
+            print(f"📊 Výpočet maximálního toku")
+            print(f"   Počáteční uzel (zdroj): {src}")
+            print(f"   Cílový uzel (výpust): {dst}")
+            print(f"   Počet uzlů: {G.number_of_nodes()}, Počet hran: {G.number_of_edges()}")
+        
+        flow_value = nx.maximum_flow_value(G, src, dst, capacity='weight')
+        
+        if verbose:
+            print(f"\n✓ Maximální tok vypočítán!")
+            print(f"   Hodnota toku: {flow_value}")
+            
+            # Detaily - rozložení toku po jednotlivých hranách
+            try:
+                flow_dict = nx.maximum_flow(G, src, dst, capacity='weight')[1]
+                print(f"\n   Rozložení toku po hranách:")
+                edge_count = 0
+                for u in flow_dict:
+                    for v in flow_dict[u]:
+                        if flow_dict[u][v] > 0:
+                            edge_count += 1
+                            print(f"      {u} → {v}: tok={flow_dict[u][v]:.2f}")
+                print(f"   Celkem hran s nenulovým tokem: {edge_count}")
+            except:
+                pass
+        
+        return flow_value
+    except Exception as e:
+        if verbose:
+            print(f"❌ Chyba: {e}")
+        return 0
+
+
+def min_cut(G, src, dst, verbose=False):
+    """Minimální řez mezi src a dst."""
+    try:
+        if verbose:
+            print(f"📊 Výpočet minimálního řezu")
+            print(f"   Počáteční uzel (zdroj): {src}")
+            print(f"   Cílový uzel (výpust): {dst}")
+            print(f"   Počet uzlů: {G.number_of_nodes()}, Počet hran: {G.number_of_edges()}")
+        
+        # Minimální řez
+        cut_value, partition = nx.minimum_cut(G, src, dst, capacity='weight')
+        
+        if verbose:
+            print(f"\n✓ Minimální řez vypočítán!")
+            print(f"   Kapacita řezu: {cut_value}")
+            
+            # Detaily - rozdělení uzlů
+            S, T = partition
+            print(f"\n   Rozdělení uzlů:")
+            print(f"      Množina S (obsahující zdroj): {sorted(S)}")
+            print(f"      Množina T (obsahující výpust): {sorted(T)}")
+            
+            # Hrany, které tvoří řez
+            print(f"\n   Hrany řezu (z S do T):")
+            cut_edges = []
+            for u in S:
+                for v in G.neighbors(u):
+                    if v in T:
+                        edge_data = G.get_edge_data(u, v)
+                        cap = edge_data.get('weight', 1) if isinstance(edge_data, dict) else 1
+                        cut_edges.append((u, v, cap))
+                        print(f"      {u} → {v}: kapacita={cap:.2f}")
+            
+            print(f"   Celkem hran v řezu: {len(cut_edges)}")
+        
+        return cut_value
+    except Exception as e:
+        if verbose:
+            print(f"❌ Chyba: {e}")
+        return 0
+
+
+def residual_capacity(G, src, dst, path, verbose=False):
+    """
+    Rezervní kapacita cesty.
+    Je to minimum z kapacit všech hran na cestě.
+    """
+    try:
+        if not path or len(path) < 2:
+            if verbose:
+                print(f"❌ Cesta je prázdná nebo příliš krátká")
+            return 0
+        
+        if verbose:
+            print(f"📊 Výpočet rezervní kapacity cesty")
+            print(f"   Cesta: {' → '.join(path)}")
+            print(f"   Počet hran: {len(path) - 1}")
+        
+        min_cap = float('inf')
+        capacities = []
+        
+        for i in range(len(path) - 1):
+            u, v = path[i], path[i+1]
+            if G.has_edge(u, v):
+                edge_data = G.get_edge_data(u, v)
+                if isinstance(edge_data, dict):
+                    cap = edge_data.get('weight', 1)
+                else:
+                    cap = 1
+                capacities.append((u, v, cap))
+                min_cap = min(min_cap, cap)
+        
+        if verbose:
+            print(f"\n✓ Rezervní kapacita vypočítána!")
+            print(f"   Detaily jednotlivých hran:")
+            for u, v, cap in capacities:
+                print(f"      {u} → {v}: kapacita={cap:.2f}")
+            print(f"   Minimální kapacita (rezervní kapacita cesty): {min_cap:.2f}")
+        
+        return min_cap if min_cap != float('inf') else 0
+    except Exception as e:
+        if verbose:
+            print(f"❌ Chyba: {e}")
+        return 0
+
+
+def augmenting_paths(G, src, dst, verbose=False):
+    """
+    Najít zlepšující cesty (augmenting paths).
+    Používá Edmondsův-Karpův algoritmus konceptuálně.
+    """
+    try:
+        if verbose:
+            print(f"📊 Hledání zlepšujících cest")
+            print(f"   Počáteční uzel (zdroj): {src}")
+            print(f"   Cílový uzel (výpust): {dst}")
+            print(f"   Počet uzlů: {G.number_of_nodes()}, Počet hran: {G.number_of_edges()}")
+        
+        # Jednoduchá implementace: najdeme cestu pomocí BFS
+        # a zaznamenáme ji jako zlepšující cestu
+        paths = []
+        G_residual = G.copy()
+        iteration = 1
+        
+        if verbose:
+            print(f"\n   Iterativní hledání cest:")
+        
+        while True:
+            try:
+                path = nx.shortest_path(G_residual, src, dst)
+                capacity = residual_capacity(G_residual, src, dst, path, verbose=False)
+                if capacity > 0:
+                    paths.append((path, capacity))
+                    if verbose:
+                        print(f"\n      Iterace {iteration}:")
+                        print(f"         Cesta: {' → '.join(path)}")
+                        print(f"         Rezervní kapacita: {capacity:.2f}")
+                    
+                    # Odstraníme hrany z cesty pro další iteraci
+                    for i in range(len(path) - 1):
+                        if G_residual.has_edge(path[i], path[i+1]):
+                            # Snížíme kapacitu (simulace)
+                            edge_data = G_residual.get_edge_data(path[i], path[i+1])
+                            if isinstance(edge_data, dict):
+                                current_cap = edge_data.get('weight', 1)
+                                edge_data['weight'] = current_cap - capacity
+                    iteration += 1
+                else:
+                    break
+            except nx.NetworkXNoPath:
+                break
+        
+        if verbose:
+            print(f"\n✓ Hledání dokončeno!")
+            print(f"   Celkový počet zlepšujících cest: {len(paths)}")
+            total_flow = sum(cap for _, cap in paths)
+            print(f"   Celkový tok všech cest: {total_flow:.2f}")
+        
+        return paths
+    except Exception as e:
+        if verbose:
+            print(f"❌ Chyba: {e}")
+        return []
+
+
 def main(argv: Optional[List[str]] = None):
     parser = argparse.ArgumentParser(description="Jednoduchý nástroj pro práci se soubory .tg (grafy)")
     sub = parser.add_subparsers(dest="cmd")
@@ -986,13 +1838,16 @@ def main(argv: Optional[List[str]] = None):
             print("  2. Reprezentace grafu")
             print("  3. Analýza uzlu")
             print("  4. Analýza hrany")
-            print("  5. Operace nad grafem")
-            print("  6. Změnit soubor")
-            print("  7. Ukončit")
+            print("  5. Stromy a kostry")
+            print("  6. Optimální sledy")
+            print("  7. Toky v sítích")
+            print("  8. Operace nad grafem")
+            print("  9. Změnit soubor")
+            print("  10. Ukončit")
             choice = get_input("Volba: ")
-            if choice == '7' or choice.lower() in ('q', 'exit'):
+            if choice == '10' or choice.lower() in ('q', 'exit'):
                 return
-            if choice == '6':
+            if choice == '9':
                 # change file
                 tg_files = sorted(glob.glob(os.path.join('.', '*.tg')))
                 for i, f in enumerate(tg_files, 1):
@@ -1556,8 +2411,186 @@ def main(argv: Optional[List[str]] = None):
                     print(f"  orientovaná: {G.is_directed()}")
                     print(f"  incidentní uzly: {u}, {v}")
 
-            # 5. Operace nad grafem
+            # 5. Stromy a kostry
             elif choice == '5':
+                print("Stromy a kostry:")
+                print("  1. Prohledat graf do hloubky (DFS)")
+                print("  2. Prohledat graf do šířky (BFS)")
+                print("  3. Počet koster grafu")
+                print("  4. Maximální kostru")
+                print("  5. Preorder traversal")
+                print("  6. Postorder traversal")
+                print("  7. Inorder traversal")
+                print("  8. Level-order traversal")
+                sc = get_input("Volba: ")
+                if sc == '1':
+                    start = input("Počáteční uzel (Enter pro automatický výběr): ").strip() or None
+                    result = dfs_traversal(G, start)
+                    clear_screen()
+                    print(f"DFS pořadí (od {start or 'náhodného uzlu'}): {' -> '.join(result)}")
+                elif sc == '2':
+                    start = input("Počáteční uzel (Enter pro automatický výběr): ").strip() or None
+                    result = bfs_traversal(G, start)
+                    clear_screen()
+                    print(f"BFS pořadí (od {start or 'náhodného uzlu'}): {' -> '.join(result)}")
+                elif sc == '3':
+                    count = count_spanning_trees(G)
+                    if count is not None and count >= 0:
+                        clear_screen()
+                        print(f"Počet koster grafu: {count}")
+                    elif count == -1:
+                        clear_screen()
+                        print("Počet koster orientovaného grafu není implementován")
+                    else:
+                        clear_screen()
+                        print("Graf není souvislý, počet koster = 0")
+                elif sc == '4':
+                    T = max_weight_spanning_tree(G)
+                    if T is not None:
+                        clear_screen()
+                        print("Hrany maximální kostry:")
+                        for u, v, d in T.edges(data=True):
+                            print(f"  {u} - {v} (váha={d.get('weight')})")
+                    else:
+                        clear_screen()
+                        print("Chyba: Nelze spočítat maximální kostru")
+                elif sc == '5':
+                    start = input("Kořen stromu (Enter pro automatický výběr): ").strip() or None
+                    result = preorder_traversal(G, start)
+                    clear_screen()
+                    print(f"Preorder (kořen, levý, pravý): {' -> '.join(result)}")
+                elif sc == '6':
+                    start = input("Kořen stromu (Enter pro automatický výběr): ").strip() or None
+                    result = postorder_traversal(G, start)
+                    clear_screen()
+                    print(f"Postorder (levý, pravý, kořen): {' -> '.join(result)}")
+                elif sc == '7':
+                    start = input("Kořen stromu (Enter pro automatický výběr): ").strip() or None
+                    result = inorder_traversal(G, start)
+                    clear_screen()
+                    print(f"Inorder (levý, kořen, pravý): {' -> '.join(result)}")
+                elif sc == '8':
+                    start = input("Kořen stromu (Enter pro automatický výběr): ").strip() or None
+                    result = levelorder_traversal(G, start)
+                    clear_screen()
+                    print(f"Level-order (BFS procházení): {' -> '.join(result)}")
+                else:
+                    print("Neplatná volba")
+
+            # 6. Optimální sledy
+            elif choice == '6':
+                print("Optimální sledy:")
+                print("  1. Nejkratší cesta")
+                print("  2. Nejdelší cesta")
+                print("  3. Nejbezpečnější cesta")
+                print("  4. Nejnebezpečnější cesta")
+                print("  5. Nejširší cesta")
+                print("  6. Nejužší cesta")
+                print("  7. Kritická cesta (projektový síťový graf)")
+                print("  8. Doba trvání projektu")
+                print("  9. Rezerva činností (slack/float)")
+                oc = get_input("Volba: ")
+                
+                if oc in ('1', '2', '3', '4', '5', '6'):
+                    src = input("Počáteční uzel: ").strip()
+                    dst = input("Cílový uzel: ").strip()
+                    if src not in G or dst not in G:
+                        print("Neznámý uzel")
+                        continue
+                    clear_screen()
+                    
+                    if oc == '1':
+                        # nejkratší - já existuje cmd_shortest
+                        class A: pass
+                        a = A(); a.file = current_file; a.src = src; a.dst = dst
+                        cmd_shortest(a)
+                    elif oc == '2':
+                        clear_screen()
+                        path, length = longest_path(G, src, dst, verbose=True)
+                        if not path:
+                            print("Cesta neexistuje (možná cyklus v grafu)")
+                    elif oc == '3':
+                        clear_screen()
+                        path, safety = safest_path(G, src, dst, verbose=True)
+                        if not path:
+                            print("Cesta neexistuje")
+                    elif oc == '4':
+                        clear_screen()
+                        path, danger = most_dangerous_path(G, src, dst, verbose=True)
+                        if not path:
+                            print("Cesta neexistuje")
+                    elif oc == '5':
+                        clear_screen()
+                        path, capacity = widest_path(G, src, dst, verbose=True)
+                        if not path:
+                            print("Cesta neexistuje")
+                    elif oc == '6':
+                        clear_screen()
+                        path, capacity = narrowest_path(G, src, dst, verbose=True)
+                        if not path:
+                            print("Cesta neexistuje")
+                
+                elif oc == '7':
+                    # Kritická cesta
+                    start = input("Počáteční uzel (Enter pro automatický): ").strip() or None
+                    end = input("Koncový uzel (Enter pro automatický): ").strip() or None
+                    clear_screen()
+                    path, length = critical_path_method(G, start, end, verbose=True)
+                    if not path:
+                        print("Kritickou cestu nelze spočítat")
+                
+                elif oc == '8':
+                    # Doba trvání projektu
+                    start = input("Počáteční uzel (Enter pro automatický): ").strip() or None
+                    end = input("Koncový uzel (Enter pro automatický): ").strip() or None
+                    clear_screen()
+                    duration = project_duration(G, start, end)
+                    print(f"\n📊 Doba trvání projektu: {duration}")
+                
+                elif oc == '9':
+                    # Rezerva činností
+                    start = input("Počáteční uzel (Enter pro automatický): ").strip() or None
+                    end = input("Koncový uzel (Enter pro automatický): ").strip() or None
+                    clear_screen()
+                    slack = activity_slack(G, start, end, verbose=True)
+                
+                else:
+                    print("Neplatná volba")
+
+            # 7. Toky v sítích
+            elif choice == '7':
+                print("Toky v sítích:")
+                print("  1. Maximální tok")
+                print("  2. Minimální řez")
+                print("  3. Rezervní kapacita cesty")
+                print("  4. Zlepšující cesty")
+                nc = get_input("Volba: ")
+                if nc in ('1', '2', '3', '4'):
+                    src = input("Počáteční uzel: ").strip()
+                    dst = input("Cílový uzel: ").strip()
+                    if src not in G or dst not in G:
+                        print("Neznámý uzel")
+                        continue
+                    clear_screen()
+                    if nc == '1':
+                        flow = max_flow(G, src, dst, verbose=True)
+                    elif nc == '2':
+                        cut = min_cut(G, src, dst, verbose=True)
+                    elif nc == '3':
+                        # Nejdřív najděme nějakou cestu
+                        try:
+                            path = nx.shortest_path(G, src, dst)
+                            clear_screen()
+                            cap = residual_capacity(G, src, dst, path, verbose=True)
+                        except nx.NetworkXNoPath:
+                            print("Cesta neexistuje")
+                    elif nc == '4':
+                        paths = augmenting_paths(G, src, dst, verbose=True)
+                else:
+                    print("Neplatná volba")
+
+            # 8. Operace nad grafem (původní sekce 5)
+            elif choice == '8':
                 print("Operace:")
                 print("  1. Nejkratší cesta mezi dvěma uzly")
                 print("  2. Minimální kostra (neorientovaný pohled)")
